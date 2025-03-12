@@ -1,19 +1,11 @@
 import bpy
-import bpy_extras
 import numpy as np
 import mathutils
 from mathutils import Vector
+from bpy_extras import view3d_utils
 def _(text):
     return bpy.app.translations.pgettext(text)
 
-
-bpy.types.Scene.distance_threshold = bpy.props.FloatProperty(
-        name="distance threshold",
-        description=_("Threshold for searching for the nearest point"),
-        default=0.2,
-        min=-0,
-        max=10,
-)
 # 获取物体的几何极值,会获得两套数据，一套是世界坐标，一套是屏幕坐标
 def get_geometry_extremes(obj,flag=True):
     world_verts = []
@@ -30,8 +22,8 @@ def get_geometry_extremes(obj,flag=True):
         view_matrix_np = np.array(view_matrix) 
         matrix = obj.matrix_world
 
-    
-    if obj.type in {'CURVE', 'META', 'SURFACE','MESH','FONT'}:
+        
+    if obj.type in {'CURVE','SURFACE','MESH','FONT'}:
 
         obj_copy = obj.copy()
         obj_copy.data = obj.data.copy() 
@@ -44,6 +36,11 @@ def get_geometry_extremes(obj,flag=True):
         eval_obj = obj_copy.evaluated_get(depsgraph)
         # 将顶点数据转换为 NumPy 数组
         mesh = eval_obj.to_mesh()
+        if len(mesh.vertices) == 0:
+            print("警告：转换后的网格没有顶点。")
+            eval_obj.to_mesh_clear()
+            return None
+
         vertices = np.empty(len(mesh.vertices) * 3, dtype=np.float32)
         mesh.vertices.foreach_get("co", vertices)
         vertices = vertices.reshape(-1, 3)  # 将数组重塑为 Nx3 的形状
@@ -52,11 +49,12 @@ def get_geometry_extremes(obj,flag=True):
         matrix_world_np = np.array(obj_copy.matrix_world)
         world_verts = np.dot(vertices, matrix_world_np[:3, :3].T) + matrix_world_np[:3, 3]
 
-        world_verts_homogeneous = np.hstack((world_verts, np.ones((world_verts.shape[0], 1))))  # 转换为齐次坐标
+        world_verts_homogeneous = np.hstack((world_verts, np.ones((world_verts.shape[0], 1))))  
         view_verts = np.dot(world_verts_homogeneous, view_matrix_np.T)  # 矩阵乘法
+
         view_verts = view_verts[:, :3]  # 去掉齐次坐标的最后一列
 
-        
+        eval_obj.to_mesh_clear()
         bpy.data.objects.remove(obj_copy, do_unlink=True)# 删除复制体
 
         if flag:
@@ -66,12 +64,22 @@ def get_geometry_extremes(obj,flag=True):
             y_min, y_max = min_coords[1], max_coords[1]
             z_min, z_max = min_coords[2], max_coords[2]
             # view_verts = [view_matrix @ world_vert for world_vert in world_verts]
+            # 找到极值点的完整坐标
+            x_min_point = view_verts[np.argmin(view_verts[:, 0])]
+            x_max_point = view_verts[np.argmax(view_verts[:, 0])]
+            y_min_point = view_verts[np.argmin(view_verts[:, 1])]
+            y_max_point = view_verts[np.argmax(view_verts[:, 1])]
         else:
             min_coords = np.min(world_verts, axis=0)
             max_coords = np.max(world_verts, axis=0)
             x_min, x_max = min_coords[0], max_coords[0]
             y_min, y_max = min_coords[1], max_coords[1]
             z_min, z_max = min_coords[2], max_coords[2]
+
+            x_min_point = world_verts[np.argmin(world_verts[:, 0])]
+            x_max_point = world_verts[np.argmax(world_verts[:, 0])]
+            y_min_point = world_verts[np.argmin(world_verts[:, 1])]
+            y_max_point = world_verts[np.argmax(world_verts[:, 1])]
 
     elif obj.type =='GPENCIL' or obj.type =='GREASEPENCIL':
         #版本小于4.3使用老的api
@@ -115,12 +123,20 @@ def get_geometry_extremes(obj,flag=True):
             x_min, x_max = min_coords[0], max_coords[0]
             y_min, y_max = min_coords[1], max_coords[1]
             z_min, z_max = min_coords[2], max_coords[2]
+            x_min_point = view_verts[np.argmin(view_verts[:, 0])]
+            x_max_point = view_verts[np.argmax(view_verts[:, 0])]
+            y_min_point = view_verts[np.argmin(view_verts[:, 1])]
+            y_max_point = view_verts[np.argmax(view_verts[:, 1])]
         else:
             min_coords = np.min(world_verts, axis=0)
             max_coords = np.max(world_verts, axis=0)
             x_min, x_max = min_coords[0], max_coords[0]
             y_min, y_max = min_coords[1], max_coords[1]
             z_min, z_max = min_coords[2], max_coords[2]
+            x_min_point = world_verts[np.argmin(world_verts[:, 0])]
+            x_max_point = world_verts[np.argmax(world_verts[:, 0])]
+            y_min_point = world_verts[np.argmin(world_verts[:, 1])]
+            y_max_point = world_verts[np.argmax(world_verts[:, 1])]
     else:
         if flag:
             world_location = obj.location
@@ -132,137 +148,157 @@ def get_geometry_extremes(obj,flag=True):
         y_min, y_max = location.y, location.y
         z_min, z_max = location.z, location.z
 
+        x_min_point = location
+        x_max_point = location
+        y_min_point = location
+        y_max_point = location
+
     return {
-        'X': (x_min, x_max),'Y': (y_min, y_max),'Z': (z_min, z_max),
+        'X': (x_min, x_max),
+        'Y': (y_min, y_max),
+        'Z': (z_min, z_max),
+        'x_min_point': x_min_point,
+        'x_max_point': x_max_point,
+        'y_min_point': y_min_point,
+        'y_max_point': y_max_point,
     }
 
-bpy.types.Scene.enable_along_curve = bpy.props.BoolProperty(
-    name="enable along curve",
-    description=_("Enable alignment to the direction of the curve"),
-    default=False,
+bpy.types.Scene.use_extreme = bpy.props.BoolProperty(
+    name="use extreme",
+    description=_("Align using extreme values"),
+    default=True,
 )
-bpy.types.Scene.enable_along_curve_XYZ = bpy.props.EnumProperty(
-        name="enable along curve XYZ",
-        description=_("Which direction should be aligned to the direction of the curve"),
-        items=[
-            ('X', "X", _("X along the normal direction of the curve")),
-            ('Y', "Y", _("Y along the normal direction of the curve")),
-            ('Z', "Z", _("Z along the normal direction of the curve")),
-        ],
-        default='X'
-    ) # type: ignore
 
 
 def find_nearest_intersection_and_tangent(curve_obj, axis, target_value, obj_location):
+    region_data = None
+    for area in bpy.context.screen.areas:
+        if area.type == 'VIEW_3D':
+            region_data = area.spaces.active.region_3d
+            break
+    if region_data:
+        view_matrix = region_data.view_matrix
 
-    # 获取曲线的评估版本（考虑所有修改器）
     depsgraph = bpy.context.evaluated_depsgraph_get()
     eval_obj = curve_obj.evaluated_get(depsgraph)
-
-    # 将曲线转换为多段线（密集采样）
     mesh = eval_obj.to_mesh()
-    vertices = [curve_obj.matrix_world @ v.co for v in mesh.vertices]
+    vertices_world = [curve_obj.matrix_world @ v.co for v in mesh.vertices]
+    vertices = [view_matrix @ v for v in vertices_world]
     eval_obj.to_mesh_clear()
 
     intersections = []
     tangents = []
 
-    # 遍历所有线段，寻找交点
     for i in range(len(vertices) - 1):
         v1 = vertices[i]
         v2 = vertices[i + 1]
 
-        # 获取线段在指定轴向上的范围
         axis_value1 = getattr(v1, axis)
         axis_value2 = getattr(v2, axis)
-        # 检查目标值是否在线段的范围内
+
         if min(axis_value1, axis_value2) <= target_value <= max(axis_value1, axis_value2):
-            # 计算插值比例
+
             t = (target_value - axis_value1) / (axis_value2 - axis_value1)
-            # 计算交点
             intersection = v1.lerp(v2, t)
-            
-            # 计算切向向量（线段的方向）
-            tangent = (v2 - v1).normalized()
             intersections.append(intersection)
+            #曲线方向计算，保留
+            tangent = (v2 - v1).normalized()
             tangents.append(tangent)
     
-    # 如果没有交点，返回 None
     if not intersections:
-        print("没有交叉点")
+        print("There are no intersections")
         return None, None
-    # 找到与物体最近的那个交点和切向向量
-    nearest_index = min(range(len(intersections)), key=lambda i: (intersections[i] - obj_location).length)
+    
+    nearest_index = min(range(len(intersections)), key=lambda i: (intersections[i] -view_matrix @ obj_location).length)
     
     return intersections[nearest_index], tangents[nearest_index]
 
-def OBJECT_OT_align_Curve(axis):
+def OBJECT_OT_align_Curve(axis,direction):
     scene = bpy.context.scene
+    region_data = None
+    for area in bpy.context.screen.areas:
+        if area.type == 'VIEW_3D':
+            region_data = area.spaces.active.region_3d
+            break
+    if region_data:
+        view_matrix = region_data.view_matrix
+
     curve_obj = bpy.context.active_object
     axis=axis.lower()
-    axis_tmp="z"
-    if axis=="zx":
-        axis="y"
-        axis_tmp="z"
-    elif axis=="zy":
-        axis="x"
-        axis_tmp="z"
-    else:
-        axis_tmp="v"
-
-    # 获取选中的物体，并过滤掉活动物体
     selected_objects = [obj for obj in bpy.context.selected_objects if obj != curve_obj]
 
-    # 遍历选中的物体
+#极值算法
     for obj in selected_objects:
-        # 获取物体在指定轴向上的坐标
-        print(obj.location.x)
-        target_value= getattr(obj.location, axis)
-        # 找到曲线与物体在指定轴向上的最近交点及其切向向量
+        obj_extremes = get_geometry_extremes(obj,True)
+        if scene.use_extreme:
+            if direction=="POSITIVE":
+                if axis == 'y':
+                    target_value = obj_extremes['x_min_point'][1]
+                elif axis == 'x':
+                    target_value = obj_extremes['y_min_point'][0]
+            else:
+                if axis == 'y':
+                    target_value = obj_extremes['x_max_point'][1]
+                elif axis == 'x':
+                    target_value = obj_extremes['y_max_point'][0]
+        else:
+            target_value = getattr(view_matrix @ obj.location, axis)
+        
         intersection, tangent = find_nearest_intersection_and_tangent(curve_obj, axis, target_value, obj.location)
-
+        
         if not intersection or not tangent:
             continue
 
-        # 计算法向向量（假设法向垂直于切向）
-        normal = Vector((-tangent.y, tangent.x, 0)).normalized()
+        # normal = Vector((-tangent.y, tangent.x, 0)).normalized()
 
-        # 对齐物体的位置
-        if axis == 'x':
-            if axis_tmp != 'z':
-                obj.location.y=intersection[1]
-        elif axis == 'y':
-            if axis_tmp != 'z':
-                obj.location.x=intersection[0]
-        if axis_tmp == 'z':
-            obj.location.z=intersection[2]
+        center_view = view_matrix @ obj.location
+        if scene.use_extreme:
+            if direction=="POSITIVE":
+                if axis == 'y':
+                    offsetX = obj_extremes['X'][0] - center_view.x
+                    offsetY = obj_extremes['x_min_point'][1] - center_view.y
+                    intersection[0] -= offsetX
+                    intersection[1] -= offsetY
+                elif axis == 'x':
+                    offsetX = obj_extremes['Y'][0] - center_view.y
+                    offsetY = obj_extremes['y_min_point'][0] - center_view.x
+                    intersection[1] -= offsetX
+                    intersection[0] -= offsetY
+            else:
+                if axis == 'y':
+                    offsetX = obj_extremes['X'][1] - center_view.x
+                    offsetY = obj_extremes['x_max_point'][1] - center_view.y
+                    intersection[0] -= offsetX
+                    intersection[1] -= offsetY
+                elif axis == 'x':
+                    offsetX = obj_extremes['Y'][1] - center_view.y
+                    offsetY = obj_extremes['y_max_point'][0] - center_view.x
+                    intersection[1] -= offsetX
+                    intersection[0] -= offsetY
+            intersection[2] = center_view.z
+            obj.location=view_matrix.inverted() @ intersection    
+        else:
             
-
-        # 对齐物体的旋转
-        if scene.enable_along_curve==True:
-            if scene.enable_along_curve_XYZ=="X":
-                print("转啊")
-                rotation_matrix = normal.to_track_quat('Z', 'Y').to_matrix().to_4x4()
-                obj.rotation_euler = rotation_matrix.to_euler()
-            elif scene.enable_along_curve_XYZ=="Y":
-                rotation_matrix = normal.to_track_quat('Y', 'Z').to_matrix().to_4x4()
-                obj.rotation_euler = rotation_matrix.to_euler()
-            elif scene.enable_along_curve_XYZ=="Z":
-                rotation_matrix = normal.to_track_quat('X', 'Y').to_matrix().to_4x4()
-                
-                obj.rotation_euler = rotation_matrix.to_euler()
+            if axis == 'x':
+                    center_view.y=intersection[1]
+            elif axis == 'y':
+                    center_view.x=intersection[0]
+            obj.location=view_matrix.inverted() @ center_view
+           
+    
+            
 
 
 class OBJECT_OT_align_Normal(bpy.types.Operator):
     bl_idname = "object.align_normal"
-    bl_label = "Extend  Alignment"
+    bl_label = _("Screen space alignment")
     bl_description = _("Align using extreme coordinates of internal data")
     bl_options = {'REGISTER', 'UNDO'} 
     
     #对齐参考对象设置
     bpy.types.Scene.align_reference = bpy.props.EnumProperty(
         name="AlignReference",
-        description="Align Reference",
+        description=_("Align Reference"),
         items=[
             ('OPTION_1', _("MinMax"), ""),
             ('OPTION_2', "Active", ""),
@@ -394,7 +430,7 @@ class OBJECT_OT_align_Normal(bpy.types.Operator):
         elif selected_reference == 'OPTION_4':#曲线模式
 
             if active_object and active_object.type in {'CURVE'}:
-                no_closest_point=OBJECT_OT_align_Curve(axis)
+                no_closest_point=OBJECT_OT_align_Curve(axis,direction)
             else:
                 self.report({'ERROR'}, _("Active object must be a Curve!"))
                 return {'CANCELLED'}
@@ -452,6 +488,33 @@ class OBJECT_OT_align_Normal(bpy.types.Operator):
 
         bpy.context.view_layer.objects.active = active_object    
 
+        return {'FINISHED'}
+    @classmethod
+    def poll(cls, context):
+        return len(context.selected_objects) > 1
+    
+class OBJECT_OT_Align_To_View(bpy.types.Operator):
+    bl_idname = "object.align_to_view" 
+    bl_label = _("Align to View")  
+    bl_description = _("Align selected objects to the current view plane")   
+    bl_options = {'REGISTER', 'UNDO'} 
+
+    def execute(self, context):
+        rv3d = context.region_data
+        if rv3d is None:
+            self.report({'ERROR'}, "Please make sure to run this operation in the 3D view")
+            return {'CANCELLED'}
+
+        view_normal = rv3d.view_rotation @ mathutils.Vector((0, 0, -1))
+
+        selected_objects = context.selected_objects
+
+        for obj in selected_objects:
+            obj_location = obj.location
+            # 将物体的位置投影到视图平面上
+            projected_location = obj_location - (obj_location.dot(view_normal)) * view_normal
+            obj.location = projected_location
+        context.view_layer.update()
         return {'FINISHED'}
     @classmethod
     def poll(cls, context):

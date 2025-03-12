@@ -146,6 +146,7 @@ def bind_to_empty():
 class BIND_TO_EMPTY_OT_Operator(bpy.types.Operator):
     bl_idname = "object.bind_to_empty"
     bl_label = _("Bind to Empty")
+    bl_description = _("Create an empty object and select the object as a subset of the empty objects")
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
@@ -163,6 +164,7 @@ class BIND_TO_EMPTY_OT_Operator(bpy.types.Operator):
 class ARRANGE_CIRCLE_OT_Operator(bpy.types.Operator):
     bl_idname = "object.arrange_in_circle"
     bl_label = _("Arrange in Circle")
+    bl_description = _("Distribute the selected objects in a circular pattern at the cursor")
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):

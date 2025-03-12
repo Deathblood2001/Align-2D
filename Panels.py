@@ -36,9 +36,9 @@ class OBJECT_PT_AlignToolsPanel(bpy.types.Panel):
         row.prop(context.scene, "align_reference", expand=True)
         
         row = box.row(align=True)
-        
+        row.label(text=_("Use screen space:"),icon_value=custom_icons["Screen_2D"].icon_id)
         if scene.align_reference != "OPTION_4":
-            row.label(text=_("Use screen space:"),icon_value=custom_icons["Screen_2D"].icon_id)
+           
             row = box.row(align=True)
             row.alignment="CENTER"
             row.scale_x = 3
@@ -158,34 +158,35 @@ class OBJECT_PT_AlignToolsPanel(bpy.types.Panel):
             op.align_axial = 'XYZ'
             op.mode_LRS = 'SUOFANG'
             row = box.row()
+            
         else:
             
-            row.prop(context.scene, "enable_along_curve", text=_("Along curve"))
-            if scene.enable_along_curve==True:
-                row.prop(context.scene, "enable_along_curve_XYZ", text=_("Along curve"), expand=True)
+            row.prop(context.scene, "use_extreme", text=_("Use mesh boundary"))
             row = box.row(align=True)
             row.alignment="CENTER"
             row.scale_x = 3
             row.scale_y = 1.2
-            op = row.operator("object.align_normal", text="",icon_value=custom_icons["Align_curveX"].icon_id)  
+            op = row.operator("object.align_normal", text="",icon_value=custom_icons["Align_curveX2"].icon_id)  
             op.align_axial = 'Y'
             op.axial_direction = 'POSITIVE'
             op.align_axial_world = 'SCREEN'
+            op = row.operator("object.align_normal", text="",icon_value=custom_icons["Align_curveX"].icon_id)  
+            op.align_axial = 'Y'
+            op.axial_direction = 'NEGATIVE'
+            op.align_axial_world = 'SCREEN'
             op = row.operator("object.align_normal", text="",icon_value=custom_icons["Align_curveY"].icon_id)  
+            op.align_axial = 'X'
+            op.axial_direction = 'POSITIVE'
+            op.align_axial_world = 'SCREEN'
+            op = row.operator("object.align_normal", text="",icon_value=custom_icons["Align_curveY2"].icon_id)  
             op.align_axial = 'X'
             op.axial_direction = 'NEGATIVE'
             op.align_axial_world = 'SCREEN'
-            op = row.operator("object.align_normal", text="",icon_value=custom_icons["Align_curveZX"].icon_id)  
-            op.align_axial = 'ZX'
-            op.axial_direction = 'NEGATIVE'
-            op.align_axial_world = 'SCREEN'
-            op = row.operator("object.align_normal", text="",icon_value=custom_icons["Align_curveZY"].icon_id)  
-            op.align_axial = 'ZY'
-            op.axial_direction = 'POSITIVE'
-            op.align_axial_world = 'SCREEN'
             row = box.row()
-
-
+        row=layout.row()
+        row.scale_y = 1.2
+        row.operator("object.align_to_view", text=_("Align to View"),icon_value=custom_icons["Align_screen"].icon_id)
+        row=layout.row()
 
 #分布面板
 class OBJECT_PT_DISTRIBUTE(bpy.types.Panel):

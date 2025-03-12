@@ -25,7 +25,7 @@ bpy.types.Scene.screen_order_sorting = bpy.props.BoolProperty(
 #添加坐标系切换
 bpy.types.Scene.distribute_sorting_method = bpy.props.EnumProperty(
         name="Sorting method",
-        description="Sort objects in chronological order",
+        description=_("The order in which objects are sorted"),
         items=[
             ('LeftToRight', "→", _("Left To Right")),
             ('RightToLeft', "←", _("Right To Left")),
@@ -71,7 +71,6 @@ class OBJECT_OT_LinearDistribution(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         return len(context.selected_objects) > 2
-
 
 
 def distribute_objects(axis,method):

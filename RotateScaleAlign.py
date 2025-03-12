@@ -1,10 +1,13 @@
 import bpy
+import gettext
+def _(text):
+    return bpy.app.translations.pgettext(text)
 current_axis = 'X'
 
 class OBJECT_OT_AlignRotateScale(bpy.types.Operator):
     bl_idname = "object.align_rotate_scale"
-    bl_label = "Rotate and Scale Alignment"
-    bl_description = "Align using data from active objects"
+    bl_label = _("Rotate and Scale Alignment")
+    bl_description = _("Align using data from active objects")
     bl_options = {'REGISTER', 'UNDO'} 
 
     align_axial:bpy.props.EnumProperty(
