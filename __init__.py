@@ -1,5 +1,5 @@
 bl_info = {
-    "name": "AlignAndDistribute-BLCN",
+    "name": "Align2D-BLCN",
     "author": "BlenderCN-DB",
     "version": (0, 0, 4),
     "blender": (4, 2, 0),
@@ -26,7 +26,7 @@ from bpy.props import (
 
 
 from . import icons
-from .NormalAlign import OBJECT_OT_align_Normal
+from .NormalAlign import OBJECT_OT_align_Normal,OBJECT_OT_Align_To_View
 from .RotateScaleAlign import OBJECT_OT_AlignRotateScale
 from .Distribution import OBJECT_OT_LinearDistribution
 from .CircularDistribution import ARRANGE_CIRCLE_OT_Operator,BIND_TO_EMPTY_OT_Operator
@@ -79,6 +79,7 @@ classes = (
     
     OBJECT_PT_DISTRIBUTE,
     OBJECT_OT_align_Normal,
+    OBJECT_OT_Align_To_View,
     OBJECT_OT_AlignRotateScale,
     OBJECT_OT_LinearDistribution,
     ARRANGE_CIRCLE_OT_Operator,
